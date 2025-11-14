@@ -5,6 +5,7 @@ baselines.py
 /output
 /clinical_notes
 .ipynb_checkpoints
+venv/
 /resources/openai.key
 __pycache__
 .output
