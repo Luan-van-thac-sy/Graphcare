@@ -531,12 +531,12 @@ if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "cluster":
         # Quick clustering test
-        task = sys.argv[2] if len(sys.argv) > 2 else "drugrec"
-        print(f"Running clustering for task: {task}")
+        task = 'mortality'
+        print(f"Running clustering for task: mortality")
 
         ent2id, rel2id, ent_emb, rel_emb = load_embeddings(task)
         map_cluster, map_cluster_inv, map_cluster_rel, map_cluster_inv_rel = clustering(
-            task=task,
+            task='mortality',
             ent_emb=ent_emb,
             rel_emb=rel_emb,
             threshold=0.15,

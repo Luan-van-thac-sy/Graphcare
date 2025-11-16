@@ -25,11 +25,11 @@ def load_everything(dataset, task, kg="", kg_ratio=1.0, th="th015"):
     if kg == "GPT-KG":
         kg = ""
     if task == "drugrec" or task == "lenofstay":
-        path_1 = "/data/pj20/exp_data/ccscm_ccsproc"
-        path_2 = "/data/pj20/g/graphs/cond_proc/CCSCM_CCSPROC"
+        path_1 = "exp_data/ccscm_ccsproc"
+        path_2 = "graphs/cond_proc/CCSCM_CCSPROC"
     elif task == "mortality" or task == "readmission":
-        path_1 = "/data/pj20/exp_data/ccscm_ccsproc_atc3"
-        path_2 = "/data/pj20/g/graphs/cond_proc_drug/CCSCM_CCSPROC_ATC3"
+        path_1 = "exp_data/ccscm_ccsproc_atc3"
+        path_2 = "graphs/cond_proc_drug/CCSCM_CCSPROC_ATC3"
 
     if kg_ratio != 1.0:
         sample_dataset_file = f"{path_1}/sample_dataset_{dataset}_{task}_{kg}{th}_kg{kg_ratio}.pkl"
@@ -37,7 +37,7 @@ def load_everything(dataset, task, kg="", kg_ratio=1.0, th="th015"):
     else:
         sample_dataset_file = f"{path_1}/sample_dataset_{dataset}_{task}_{kg}{th}.pkl"
         graph_file = f"{path_1}/graph_{dataset}_{task}_{kg}{th}.pkl"
-    map_cluster_file = f"{path_1}/clusters_{th}.json" 
+    map_cluster_file = f"{path_1}/clusters_{th}.json"
     map_cluster_inv = f"{path_1}/clusters_inv_{th}.json"
     map_cluster_rel = f"{path_1}/clusters_rel_{th}.json"
     map_cluster_rel_inv = f"{path_1}/clusters_inv_rel_{th}.json"
@@ -137,7 +137,7 @@ def label_ehr_nodes(task, sample_dataset, max_nodes, ccscm_id2clus, ccsproc_id2c
         # make one-hot encoding
         node_vec = np.zeros(max_nodes)
         node_vec[nodes] = 1
-        
+
         patient['ehr_node_set'] = torch.tensor(node_vec)
 
     return sample_dataset
@@ -157,7 +157,7 @@ def label_k_hop_nodes(G, dataset, k=1):
     for patient in tqdm(dataset):
         nodes, _, _, _ = k_hop_subgraph(torch.tensor(patient['node_set']), k, G.edge_index)
         patient['node_set'] = nodes.tolist()
-    
+
     return dataset
 
 
@@ -167,7 +167,7 @@ def get_subgraph(G, dataset, task, idx, strategy="1"):
         idx -= 1
         patient = dataset[idx]
 
-    # less focused 
+    # less focused
     # L = G.subgraph(torch.tensor(patient['node_set']))
     # P = L.edge_subgraph(torch.tensor(patient['node_set']))
 
@@ -190,11 +190,11 @@ def get_subgraph(G, dataset, task, idx, strategy="1"):
         P.label = torch.tensor(label)
     else:
         P.label = patient['label']
-    
+
     P.visit_padded_node = patient['visit_padded_node']
     P.ehr_nodes = patient['ehr_node_set']
     P.patient_id = patient['patient_id']
-    
+
     return P
 
 class Dataset(torch.utils.data.Dataset):
@@ -219,7 +219,7 @@ def get_dataloader(G_tg, train_dataset, val_dataset, test_dataset, task, batch_s
 
     return train_loader, val_loader, test_loader
 
-    
+
 def train(mode, patient_mode, gnn, model, device, train_loader, optimizer, loss_func):
     model.train()
     training_loss = 0
@@ -234,13 +234,13 @@ def train(mode, patient_mode, gnn, model, device, train_loader, optimizer, loss_
         node_ids = data.y
         rel_ids = data.relation
         ehr_nodes = data.ehr_nodes.reshape(int(train_loader.batch_size), int(len(data.ehr_nodes)/train_loader.batch_size)).float() if patient_mode != "graph" else None
-        visit_node = data.visit_padded_node.reshape(int(train_loader.batch_size), int(len(data.visit_padded_node)/train_loader.batch_size), data.visit_padded_node.shape[1]).float() 
+        visit_node = data.visit_padded_node.reshape(int(train_loader.batch_size), int(len(data.visit_padded_node)/train_loader.batch_size), data.visit_padded_node.shape[1]).float()
         out = model(
-                node_ids = node_ids, 
+                node_ids = node_ids,
                 rel_ids = rel_ids,
                 edge_index = data.edge_index,
                 batch = data.batch,
-                visit_node = visit_node, 
+                visit_node = visit_node,
                 ehr_nodes = ehr_nodes,
                 in_drop=True,
             )
@@ -252,7 +252,7 @@ def train(mode, patient_mode, gnn, model, device, train_loader, optimizer, loss_
         training_loss = loss
         tot_loss += loss
         optimizer.step()
-    
+
     return tot_loss
 
 def evaluate(mode, patient_mode, gnn, model, device, loader):
@@ -262,15 +262,15 @@ def evaluate(mode, patient_mode, gnn, model, device, loader):
 
     for data in tqdm(loader):
         data = data.to(device)
-        with torch.no_grad():    
+        with torch.no_grad():
 
             node_ids = data.y
             rel_ids = data.relation
             ehr_nodes = data.ehr_nodes.reshape(int(loader.batch_size), int(len(data.ehr_nodes)/loader.batch_size)).float() if patient_mode != "graph" else None
-            visit_node = data.visit_padded_node.reshape(int(loader.batch_size), int(len(data.visit_padded_node)/loader.batch_size), data.visit_padded_node.shape[1]).float() 
+            visit_node = data.visit_padded_node.reshape(int(loader.batch_size), int(len(data.visit_padded_node)/loader.batch_size), data.visit_padded_node.shape[1]).float()
             model
             logits = model(
-                    node_ids = node_ids, 
+                    node_ids = node_ids,
                     rel_ids = rel_ids,
                     edge_index = data.edge_index,
                     batch = data.batch,
@@ -282,12 +282,12 @@ def evaluate(mode, patient_mode, gnn, model, device, loader):
                 y_prob = F.softmax(logits, dim=-1)
             else:
                 y_prob = torch.sigmoid(logits)
-            
+
             y_true = data.label.reshape(int(loader.batch_size), int(len(data.label)/loader.batch_size))
 
             y_prob_all.append(y_prob.cpu())
             y_true_all.append(y_true.cpu())
-            
+
     y_true_all = np.concatenate(y_true_all, axis=0)
     y_prob_all = np.concatenate(y_prob_all, axis=0)
 
@@ -300,7 +300,7 @@ def train_loop(dataset, task, mode, patient_mode, gnn, train_loader, val_loader,
     for epoch in range(1, epochs+1):
         loss = train(mode, patient_mode, gnn, model, device, train_loader, optimizer, loss_func)
         y_true_all, y_prob_all = evaluate(mode, patient_mode, gnn, model, device, val_loader)
-        
+
         if mode == "binary":
             y_pred_all = (y_prob_all >= 0.5).astype(int)
 
@@ -334,7 +334,7 @@ def train_loop(dataset, task, mode, patient_mode, gnn, train_loader, val_loader,
             val_recall = 0
 
         if val_roc_auc >= best_roc_auc:
-            torch.save(model.state_dict(), f'../../../data/pj20/exp_data/saved_weights_{dataset}_{task}_{model.gnn}.pkl')
+            torch.save(model.state_dict(), f'exp_data/saved_weights_{dataset}_{task}_{model.gnn}.pkl')
             print("best model saved")
             best_roc_auc = val_roc_auc
             early_stop_indicator = 0
@@ -363,16 +363,16 @@ def construct_args():
     parser.add_argument('--dataset', type=str, default='mimic3')
     parser.add_argument('--task', type=str, default='mortality')
     parser.add_argument('--kg', type=str, default='GPT-KG')
-    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--hidden_dim', type=int, default=128)
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--num_layers', type=int, default=3)
     parser.add_argument('--decay_rate', type=float, default=0.01)
     parser.add_argument('--freeze_emb', type=str, default="False")
-    parser.add_argument('--device', type=int, default=1)
+    parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--patient_mode', type=str, default='joint', choices=['joint', 'graph', 'node'])
     parser.add_argument('--alpha', type=str, default="True", choices=["True", "False"])
     parser.add_argument('--beta', type=str, default="True", choices=["True", "False"])
@@ -411,14 +411,14 @@ def single_run(args, params):
 
     dataset, task, kg, batch_size, hidden_dim, epochs, lr, weight_decay, dropout, num_layers, decay_rate, gnn, patient_mode, alpha, beta, edge_attn, freeze, attn_init, in_drop_rate, kg_ratio, train_ratio, feat_ratio = \
         params['dataset'], params['task'], params['kg'], params['batch_size'], params['hidden_dim'], params['epochs'], params['lr'], params['weight_decay'], params['dropout'], params['num_layers'], params['decay_rate'], params['gnn'], params['patient_mode'], params['alpha'], params['beta'], params['edge_attn'], params['freeze'], params['attn_init'], params['in_drop_rate'], params['kg_ratio'], params['train_ratio'], params['feat_ratio']
-     
+
     run = neptune.init_run(
         project="patrick.jiang.cs/GraphCare",
         api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJlNDFjZWU1ZC1mZGM5LTQ2MTItYTk3ZC02ODIzOTA4MTY0YmIifQ==",
     )
 
     run["parameters"] = params
-    
+
     device = torch.device(f"cuda:{args.device}" if torch.cuda.is_available() else 'cpu')
     logger = get_logger(dataset, task, kg, hidden_dim, epochs, lr, decay_rate, dropout, num_layers)
 
@@ -441,21 +441,21 @@ def single_run(args, params):
     print("Splitting dataset...")
     train_dataset, val_dataset, test_dataset = split_by_patient(sample_dataset, [0.8, 0.1, 0.1], train_ratio=train_ratio, seed=528)
     if feat_ratio != 1.0:
-        # with open(f'/data/pj20/exp_data/ccscm_ccsproc/val_dataset_mimic3_{task}_th015_{feat_ratio}.pkl', 'rb') as f:
+        # with open(f'exp_data/ccscm_ccsproc/val_dataset_mimic3_{task}_th015_{feat_ratio}.pkl', 'rb') as f:
         #     val_dataset = pickle.load(f)
         #     val_dataset = label_ehr_nodes(task, val_dataset, len(map_cluster), ccscm_id2clus, ccsproc_id2clus, atc3_id2clus)
-        with open(f'/data/pj20/exp_data/ccscm_ccsproc/train_dataset_mimic3_{task}_th015_{feat_ratio}.pkl', 'rb') as f:
+        with open(f'exp_data/ccscm_ccsproc/train_dataset_mimic3_{task}_th015_{feat_ratio}.pkl', 'rb') as f:
             train_dataset = pickle.load(f)
             train_dataset = label_ehr_nodes(task, train_dataset, len(map_cluster), ccscm_id2clus, ccsproc_id2clus, atc3_id2clus)
     # get initial node attention
     print("Getting initial node attention...")
     if task == "mortality" or task == "readmission":
-        attn_file = f"/data/pj20/exp_data/ccscm_ccsproc_atc3/attention_weights_{task}.pkl"
+        attn_file = f"exp_data/ccscm_ccsproc_atc3/attention_weights_{task}.pkl"
     elif task == "lenofstay" or task == "drugrec":
-        attn_file = f"/data/pj20/exp_data/ccscm_ccsproc/attention_weights_{task}.pkl"
+        attn_file = f"exp_data/ccscm_ccsproc/attention_weights_{task}.pkl"
     else:
         raise NotImplementedError
-    
+
     with open(attn_file, "rb") as f:
         attn_weights = torch.tensor(pickle.load(f))
 
@@ -463,7 +463,7 @@ def single_run(args, params):
     # get embedding
     print("Getting embedding...")
     rel_emb = get_rel_emb(map_cluster_rel)
-    node_emb = G_tg.x 
+    node_emb = G_tg.x
 
     num_nodes=node_emb.shape[0]
     num_rels=rel_emb.shape[0]
@@ -472,7 +472,7 @@ def single_run(args, params):
     # get dataloader
     print("Getting dataloader...")
     train_loader, val_loader, test_loader = get_dataloader(G_tg, train_dataset, val_dataset, test_dataset, task, batch_size, strategy="1")
-    
+
     # get model
     print("Getting model...")
     model = GraphCare(
@@ -516,15 +516,15 @@ def single_run(args, params):
         task=task,
         mode=mode,
         patient_mode=patient_mode,
-        gnn=gnn, 
-        train_loader=train_loader, 
-        val_loader=val_loader, 
-        model=model, 
-        optimizer=optimizer, 
-        loss_func=loss_function, 
-        device=device, 
-        epochs=epochs, 
-        logger=logger, 
+        gnn=gnn,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        model=model,
+        optimizer=optimizer,
+        loss_func=loss_function,
+        device=device,
+        epochs=epochs,
+        logger=logger,
         run=run
         )
 
@@ -541,22 +541,22 @@ def hyper_search_(args, params):
         'num_layers': [1, 2, 3, 4],
         'decay_rate': [0.01, 0.02, 0.03],
         'patient_mode': [
-            "joint", 
-            "graph", 
+            "joint",
+            "graph",
             "node"
             ],
         # 'gnn' : [
-        #     "GAT", 
-        #     "GIN", 
+        #     "GAT",
+        #     "GIN",
         #     "BAT"
         #     ],
         # 'edge_attn': [True, False]
         # "in_drop_rate":[
-        #     0.1, 
-        #     0.2, 
-        #     0.3, 
-        #     0.5, 
-        #     0.7, 
+        #     0.1,
+        #     0.2,
+        #     0.3,
+        #     0.5,
+        #     0.7,
         #     0.9
         # ]
         # "kg_ratio":[
@@ -605,12 +605,12 @@ def hyper_search_(args, params):
         #     0.9,
         # ]
 
-        
+
     }
     for task in [
-        # "mortality", 
-        # "readmission", 
-        # "lenofstay", 
+        # "mortality",
+        # "readmission",
+        # "lenofstay",
         "drugrec"
         ]:
         hyperparameter_options["task"] = [task]
@@ -655,7 +655,7 @@ def main():
         "train_ratio": 1.0,
         "feat_ratio": 1.0
     }
-    
+
     print(parameters)
 
     if hyper_search:
