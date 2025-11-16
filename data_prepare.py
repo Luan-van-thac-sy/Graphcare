@@ -15,9 +15,9 @@ from torch_geometric.utils import to_networkx, from_networkx
 
 def load_dataset(load_processed_dataset, dataset, task):
     if task == "drugrec":
-        file_name = f'/data/pj20/exp_data/ccscm_ccsproc/sample_dataset_{dataset}_{task}_th015.pkl'
-    elif task == "mortality" or task == "readmission" or task == "lenofstay":        
-        file_name = f'/data/pj20/exp_data/ccscm_ccsproc_atc3/sample_dataset_{dataset}_{task}_th015.pkl'
+        file_name = f'./exp_data/ccscm_ccsproc/sample_dataset_{dataset}_{task}_th015.pkl'
+    elif task == "mortality" or task == "readmission" or task == "lenofstay":
+        file_name = f'./exp_data/ccscm_ccsproc_atc3/sample_dataset_{dataset}_{task}_th015.pkl'
 
     if load_processed_dataset:
         ### load processed dataset
@@ -25,7 +25,7 @@ def load_dataset(load_processed_dataset, dataset, task):
 
         with open(file_name, 'rb') as f:
                 sample_dataset = pickle.load(f)
-            
+
     else:
         condition_mapping_file = "./resources/CCSCM.csv"
         procedure_mapping_file = "./resources/CCSPROC.csv"
@@ -54,8 +54,8 @@ def load_dataset(load_processed_dataset, dataset, task):
 
         if dataset == "mimic3":
             ds = MIMIC3Dataset(
-            root="/data/physionet.org/files/mimiciii/1.4/", 
-            tables=["DIAGNOSES_ICD", "PROCEDURES_ICD", "PRESCRIPTIONS"],      
+            root="./data/mimiciii/1.4/",
+            tables=["DIAGNOSES_ICD", "PROCEDURES_ICD", "PRESCRIPTIONS"],
             code_mapping={
                 "NDC": ("ATC", {"target_kwargs": {"level": 3}}),
                 "ICD9CM": "CCSCM",
@@ -64,8 +64,8 @@ def load_dataset(load_processed_dataset, dataset, task):
             )
         elif dataset == "mimic4":
             ds = MIMIC4Dataset(
-            root="/data/physionet.org/files/mimiciv/2.0/hosp/", 
-            tables=["diagnoses_icd", "procedures_icd", "prescriptions"],      
+            root="./data/mimiciv/2.0/hosp/",
+            tables=["diagnoses_icd", "procedures_icd", "prescriptions"],
             code_mapping={
                 "NDC": ("ATC", {"target_kwargs": {"level": 3}}),
                 "ICD9CM": "CCSCM",
@@ -96,7 +96,7 @@ def load_dataset(load_processed_dataset, dataset, task):
                 sample_dataset = ds.set_task(length_of_stay_prediction_mimic3_fn)
             elif dataset == "mimic4":
                 sample_dataset = ds.set_task(length_of_stay_prediction_mimic4_fn)
-    
+
     return sample_dataset
 
 
@@ -187,9 +187,13 @@ def prepare_drug_indices(sample_dataset):
 
 def clustering(task, ent_emb, rel_emb, threshold=0.15, load_cluster=False, save_cluster=False):
     if task == "drugrec" or task == "lenofstay":
-        path = "/data/pj20/exp_data/ccscm_ccsproc"
+        path = "./exp_data/ccscm_ccsproc"
     else:
-        path = "/data/pj20/exp_data/ccscm_ccsproc_atc3"
+        path = "./exp_data/ccscm_ccsproc_atc3"
+
+    # Create directory if it doesn't exist
+    import os
+    os.makedirs(path, exist_ok=True)
 
     if load_cluster:
         with open(f'{path}/clusters_th015.json', 'r', encoding='utf-8') as f:
@@ -202,7 +206,7 @@ def clustering(task, ent_emb, rel_emb, threshold=0.15, load_cluster=False, save_
             map_cluster_inv_rel = json.load(f)
 
     else:
-        cluster_alg = AgglomerativeClustering(n_clusters=None, distance_threshold=threshold, linkage='average', affinity='cosine')
+        cluster_alg = AgglomerativeClustering(n_clusters=None, distance_threshold=threshold, linkage='average', metric='cosine')
         cluster_labels = cluster_alg.fit_predict(ent_emb)
         cluster_labels_rel = cluster_alg.fit_predict(rel_emb)
 
@@ -254,15 +258,15 @@ def clustering(task, ent_emb, rel_emb, threshold=0.15, load_cluster=False, save_
                 json.dump(map_cluster_rel, f, indent=6)
             with open(f'{path}/clusters_inv_rel_th015.json', 'w', encoding='utf-8') as f:
                 json.dump(map_cluster_inv_rel, f, indent=6)
-        
+
     return map_cluster, map_cluster_inv, map_cluster_rel, map_cluster_inv_rel
 
 
 def process_graph(dataset, task, sample_dataset, ent2id, rel2id, map_cluster, map_cluster_inv, map_cluster_rel, map_cluster_inv_rel, save_graph=False):
     if task == "drugrec" or task == "lenofstay":
-        path = "/data/pj20/exp_data/ccscm_ccsproc"
+        path = "./exp_data/ccscm_ccsproc"
     else:
-        path = "/data/pj20/exp_data/ccscm_ccsproc_atc3"
+        path = "./exp_data/ccscm_ccsproc_atc3"
 
     G = nx.Graph()
 
@@ -295,7 +299,7 @@ def process_graph(dataset, task, sample_dataset, ent2id, rel2id, map_cluster, ma
                         triple_set.add(triple)
                 except:
                     continue
-        
+
         procedures = flatten(patient['procedures'])
         for procedure in procedures:
             proc_file = f'./graphs/procedure/CCSPROC/{procedure}.txt'
@@ -314,7 +318,7 @@ def process_graph(dataset, task, sample_dataset, ent2id, rel2id, map_cluster, ma
                         if triple not in triple_set:
                             edge = (int(map_cluster_inv[h]), int(map_cluster_inv[t]))
                             G.add_edge(*edge, relation=int(map_cluster_inv_rel[r]))
-                            triple_set.add(triple)   
+                            triple_set.add(triple)
                 except:
                     continue
 
@@ -363,22 +367,22 @@ def pad_and_convert(visits, max_visits, max_nodes):
 
 def process_sample_dataset(dataset, task, sample_dataset, G_tg, ent2id, rel2id, map_cluster, map_cluster_inv, map_cluster_rel, map_cluster_inv_rel, save_dataset=False):
     if task == "drugrec" or task == "lenofstay":
-        path = "/data/pj20/exp_data/ccscm_ccsproc"
+        path = "./exp_data/ccscm_ccsproc"
     else:
-        path = "/data/pj20/exp_data/ccscm_ccsproc_atc3"
+        path = "./exp_data/ccscm_ccsproc_atc3"
 
     c_v = []
     for patient in sample_dataset:
         c_v.append(len(patient['conditions']))
 
-    max_visits = max(c_v)      
+    max_visits = max(c_v)
 
     for patient in tqdm(sample_dataset):
         node_set_all = set()
         node_set_list = []
         for visit_i in range(len(patient['conditions'])):
             triple_set = set()
-            node_set = set() 
+            node_set = set()
             conditions = patient['conditions'][visit_i]
             procedures = patient['procedures'][visit_i]
             if task == "mortality" or task == "readmission":
@@ -508,13 +512,13 @@ def run(dataset, task):
 
 def main():
     datasets = [
-        # "mimic3", 
+        # "mimic3",
         "mimic4"
         ]
     tasks = [
-        # "drugrec", 
-        "mortality", 
-        "readmission", 
+        # "drugrec",
+        "mortality",
+        "readmission",
         "lenofstay"
         ]
 
@@ -524,4 +528,22 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "cluster":
+        # Quick clustering test
+        task = sys.argv[2] if len(sys.argv) > 2 else "drugrec"
+        print(f"Running clustering for task: {task}")
+
+        ent2id, rel2id, ent_emb, rel_emb = load_embeddings(task)
+        map_cluster, map_cluster_inv, map_cluster_rel, map_cluster_inv_rel = clustering(
+            task=task,
+            ent_emb=ent_emb,
+            rel_emb=rel_emb,
+            threshold=0.15,
+            load_cluster=False,
+            save_cluster=True
+        )
+        print(f"✓ Created {len(map_cluster)} entity clusters")
+        print(f"✓ Created {len(map_cluster_rel)} relation clusters")
+    else:
+        main()
