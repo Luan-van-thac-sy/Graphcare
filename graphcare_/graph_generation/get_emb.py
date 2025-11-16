@@ -1,8 +1,8 @@
 import requests
 import json
 
-# with open("../../resources/openai.key", 'r') as f:
-key ="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"
+with open("../../resources/openai.key", 'r') as f:
+    key = f.read().strip()
 
 def embedding_retriever_batch(terms):
     """
