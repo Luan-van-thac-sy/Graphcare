@@ -2,7 +2,7 @@ import pickle
 import json
 import random
 import networkx as nx
-from pyhealth.datasets import SampleDataset
+# from pyhealth.datasets import SampleDataset
 from graphcare_ import split_by_patient
 from torch_geometric.utils import to_networkx, from_networkx
 from tqdm import tqdm

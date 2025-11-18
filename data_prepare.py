@@ -13,7 +13,7 @@ import networkx as nx
 from torch_geometric.utils import to_networkx, from_networkx
 
 
-def load_dataset(load_processed_dataset, dataset, task):
+def load_dataset(load_processed_dataset, dataset, task, max_patients=None):
     if task == "drugrec":
         file_name = f'./exp_data/ccscm_ccsproc/sample_dataset_{dataset}_{task}_th015.pkl'
     elif task == "mortality" or task == "readmission" or task == "lenofstay":
@@ -96,6 +96,11 @@ def load_dataset(load_processed_dataset, dataset, task):
                 sample_dataset = ds.set_task(length_of_stay_prediction_mimic3_fn)
             elif dataset == "mimic4":
                 sample_dataset = ds.set_task(length_of_stay_prediction_mimic4_fn)
+
+    # Limit the number of patients if max_patients is specified
+    if max_patients is not None and len(sample_dataset) > max_patients:
+        print(f"⚠️  Limiting dataset from {len(sample_dataset)} to {max_patients} patients to reduce RAM usage")
+        sample_dataset.samples = sample_dataset.samples[:max_patients]
 
     return sample_dataset
 
@@ -180,8 +185,36 @@ def prepare_label(sample_dataset, drugs):
 
 
 def prepare_drug_indices(sample_dataset):
-    for patient in tqdm(sample_dataset):
-        patient['drugs_ind'] = torch.tensor(prepare_label(sample_dataset, patient['drugs']))
+    """Optimized version: Create tokenizer once instead of per-patient"""
+    print("Creating drug tokenizer (this may take a moment)...")
+
+    # Create tokenizer ONCE for all patients (not per patient!)
+    label_tokenizer = Tokenizer(
+        sample_dataset.get_all_tokens(key='drugs')
+    )
+    num_labels = label_tokenizer.get_vocabulary_size()
+
+    print(f"Processing {len(sample_dataset)} patients with {num_labels} unique drugs...")
+
+    # Now process each patient with the pre-built tokenizer
+    for patient in tqdm(sample_dataset, desc="Encoding drug labels"):
+        # Flatten all drugs for this patient
+        all_drugs = []
+        if isinstance(patient['drugs'], list):
+            for visit_drugs in patient['drugs']:
+                if isinstance(visit_drugs, list):
+                    all_drugs.extend(visit_drugs)
+                else:
+                    all_drugs.append(visit_drugs)
+
+        # Convert to indices and create multihot
+        labels_index = label_tokenizer.convert_tokens_to_indices(all_drugs)
+        multihot_labels = np.zeros(num_labels)
+        for idx in labels_index:
+            multihot_labels[idx] = 1
+
+        patient['drugs_ind'] = torch.tensor(multihot_labels)
+
     return sample_dataset
 
 
@@ -472,7 +505,7 @@ def process_sample_dataset(dataset, task, sample_dataset, G_tg, ent2id, rel2id, 
     return sample_dataset
 
 
-def run(dataset, task):
+def run(dataset, task, max_patients=None):
     if task == "drugrec":
         load_processed_dataset = False
     else:
@@ -488,9 +521,11 @@ def run(dataset, task):
     print(f"Save cluster: {save_cluster}")
     print(f"Save graph: {save_graph}")
     print(f"Save processed dataset: {save_processed_dataset}")
+    if max_patients:
+        print(f"Max patients limit: {max_patients}")
 
     print("Loading dataset...")
-    sample_dataset = load_dataset(load_processed_dataset, dataset=dataset, task=task)
+    sample_dataset = load_dataset(load_processed_dataset, dataset=dataset, task=task, max_patients=max_patients)
 
     print("Loading embeddings...")
     ent2id, rel2id, ent_emb, rel_emb = load_embeddings(task)
@@ -511,24 +546,29 @@ def run(dataset, task):
 
 
 def main():
+    # Set max_patients to limit RAM usage (None = no limit, 10000 = safer for 55GB RAM)
+    MAX_PATIENTS = 10000  # Adjust this value based on your RAM availability
+
     datasets = [
-        # "mimic3",
-        "mimic4"
+        "mimic3",
+        # "mimic4"
         ]
     tasks = [
-        # "drugrec",
-        "mortality",
-        "readmission",
-        "lenofstay"
+        "drugrec",
+        # "mortality",
+        # "readmission",
+        # "lenofstay"
         ]
 
     for dataset in datasets:
         for task in tasks:
-            run(dataset, task)
+            run(dataset, task, max_patients=MAX_PATIENTS)
 
 
 if __name__ == "__main__":
     import sys
+    import argparse
+
     if len(sys.argv) > 1 and sys.argv[1] == "cluster":
         # Quick clustering test
         task = 'mortality'
@@ -546,4 +586,30 @@ if __name__ == "__main__":
         print(f"✓ Created {len(map_cluster)} entity clusters")
         print(f"✓ Created {len(map_cluster_rel)} relation clusters")
     else:
-        main()
+        parser = argparse.ArgumentParser(description='Process MIMIC dataset for GraphCare')
+        parser.add_argument('--max-patients', type=int, default=10000,
+                            help='Maximum number of patients to process (default: 10000, use 0 for no limit)')
+        parser.add_argument('--dataset', type=str, choices=['mimic3', 'mimic4'],
+                            help='Dataset to process (default: run all in main())')
+        parser.add_argument('--task', type=str, choices=['drugrec', 'mortality', 'readmission', 'lenofstay'],
+                            help='Task to process (default: run all in main())')
+
+        args = parser.parse_args()
+
+        max_patients = args.max_patients if args.max_patients > 0 else None
+
+        if args.dataset and args.task:
+            # Run specific dataset and task
+            print(f"Running single task: {args.dataset} - {args.task}")
+            run(args.dataset, args.task, max_patients=max_patients)
+        else:
+            # Run main with custom max_patients
+            if max_patients:
+                print(f"Running with max_patients={max_patients}")
+                datasets = ["mimic3"]
+                tasks = ["drugrec"]
+                for dataset in datasets:
+                    for task in tasks:
+                        run(dataset, task, max_patients=max_patients)
+            else:
+                main()
