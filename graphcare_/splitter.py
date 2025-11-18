@@ -1,10 +1,14 @@
 from itertools import chain
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Tuple, Union, List, TYPE_CHECKING
 
 import numpy as np
 import torch
 
-from pyhealth.datasets import SampleDataset
+if TYPE_CHECKING:
+    from pyhealth.datasets import SampleDataset
+else:
+    # Use a dummy type for runtime if SampleDataset is not available
+    SampleDataset = None
 
 
 # TODO: train_dataset.dataset still access the whole dataset which may leak information
